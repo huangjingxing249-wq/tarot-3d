@@ -215,7 +215,7 @@ function revealCards() {
 }
 
 /* =====================
-   MediaPipe Hands
+   MediaPipe Hands 稳定版
 ===================== */
 const hands = new Hands({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
@@ -228,19 +228,32 @@ hands.setOptions({
 });
 
 hands.onResults(res=>{
-    if (!res.multiHandLandmarks) return;
+    if (!res.multiHandLandmarks || res.multiHandLandmarks.length===0) return;
 
     if (!hasSeenHand) {
         document.getElementById('loading')?.remove();
-        hasSeenHand=true;
+        hasSeenHand = true;
     }
 
     const lm = res.multiHandLandmarks[0];
-    const isFist = lm[8].y>lm[6].y && lm[12].y>lm[10].y && lm[16].y>lm[14].y;
-    const isPoint = lm[8].y<lm[6].y && lm[12].y>lm[10].y;
 
-    if (isFist && currentState==='IDLE') spreadCards();
-    if (isPoint && currentState==='FAN') selectOneCard();
+    const fingerExtended = (tip, pip) => tip.y < pip.y;
+    const indexExtended  = fingerExtended(lm[8],  lm[6]);
+    const middleExtended = fingerExtended(lm[12], lm[10]);
+    const ringExtended   = fingerExtended(lm[16], lm[14]);
+    const pinkyExtended  = fingerExtended(lm[20], lm[18]);
+
+    const isFist = !indexExtended && !middleExtended && !ringExtended && !pinkyExtended;
+    const isPoint = indexExtended && !middleExtended && !ringExtended && !pinkyExtended;
+
+    if (!hands.fistFrames) hands.fistFrames=0;
+    if (!hands.pointFrames) hands.pointFrames=0;
+
+    if (isFist) hands.fistFrames++; else hands.fistFrames=0;
+    if (isPoint) hands.pointFrames++; else hands.pointFrames=0;
+
+    if (hands.fistFrames>5 && currentState==='IDLE') { spreadCards(); hands.fistFrames=0; }
+    if (hands.pointFrames>5 && currentState==='FAN') { selectOneCard(); hands.pointFrames=0; }
 });
 
 /* =====================
